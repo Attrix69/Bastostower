@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1030" />
+    <meta name="description" content="Bastos Tower — baston 1v1 à la première personne sur le toit d'un immeuble. Fais tomber ton adversaire !" />
+    <title>Bastos Tower</title>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <!-- loading -->
+    <div id="loading" class="screen">
+      <div class="logo small">BASTOS<span>TOWER</span></div>
+      <div class="loader"><div class="loader-bar" id="loaderBar"></div></div>
+      <div class="loader-text" id="loaderText">Chauffage des poings…</div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div class="fighter-panel left" id="pPanel">
+        <div class="fp-head">
+          <div class="fp-name" id="pName">TOI</div>
+          <div class="fp-state" id="pState">EN FORME</div>
+        </div>
+        <div class="bar health"><div class="bar-ghost" id="pGhost"></div><div class="bar-fill" id="pHealth"></div><div class="bar-ticks"></div></div>
+        <div class="bar thin stamina"><div class="bar-fill" id="pStamina"></div></div>
+        <div class="bar thin daze"><div class="bar-fill" id="pDaze"></div></div>
+      </div>
+      <div class="fighter-panel right" id="ePanel">
+        <div class="fp-head">
+          <div class="fp-state" id="eState">EN FORME</div>
+          <div class="fp-name"><span id="eName">GÉGÉ</span> <small id="eNick"></small></div>
+        </div>
+        <div class="bar health"><div class="bar-ghost" id="eGhost"></div><div class="bar-fill" id="eHealth"></div><div class="bar-ticks"></div></div>
+        <div class="bar thin daze"><div class="bar-fill" id="eDaze"></div></div>
+      </div>
+      <div id="score"><span id="scoreP">0</span><i>—</i><span id="scoreE">0</span></div>
+
+      <div id="crosshair"><div class="dot"></div><div class="hitmarker" id="hitmarker"></div><div class="charge" id="charge"></div></div>
+      <div id="prompt" class="hidden">
+        <div class="prompt-main"><kbd>E</kbd><span id="promptLabel">Saisir</span></div>
+        <div class="prompt-hints" id="promptHints"></div>
+      </div>
+      <div id="mash" class="hidden">
+        <div class="mash-title">LIBÈRE-TOI !</div>
+        <div class="mash-sub">Martèle <kbd>ESPACE</kbd> / les touches !</div>
+        <div class="bar mash-bar"><div class="bar-fill" id="mashFill"></div></div>
+      </div>
+      <div id="enemyKo" class="hidden"></div>
+      <div id="announcer"></div>
+      <div id="combo"></div>
+      <div id="edgeWarn" class="hidden">⚠ LE VIDE ⚠</div>
+      <div id="stunOverlay"></div>
+      <div id="controlsHint">
+        <div><kbd>CLIC G</kbd><kbd>CLIC D</kbd> poings (maintenir = coup chargé)</div>
+        <div><kbd>F</kbd> coup de pied · <kbd id="kBlock">Q</kbd> garde · <kbd>C</kbd> esquive · <kbd>E</kbd> saisir / ramasser</div>
+      </div>
+    </div>
+
+    <!-- main menu -->
+    <div id="menu" class="screen hidden">
+      <div class="menu-inner">
+        <div class="logo">BASTOS<span>TOWER</span></div>
+        <div class="tagline">Une seule règle&nbsp;: <b>fais-le tomber du toit.</b></div>
+        <button class="btn primary" id="playBtn">JOUER</button>
+        <div class="settings">
+          <div class="row">
+            <label>Adversaire</label>
+            <div class="seg" id="oppSeg"></div>
+          </div>
+          <div class="row">
+            <label>Difficulté</label>
+            <div class="seg" id="diffSeg">
+              <button data-v="easy">Facile</button><button data-v="normal">Normal</button><button data-v="hard">Brutal</button>
+            </div>
+          </div>
+          <div class="row">
+            <label>Qualité</label>
+            <div class="seg" id="qualSeg">
+              <button data-v="low">Bas</button><button data-v="medium">Moyen</button><button data-v="high">Élevé</button>
+            </div>
+          </div>
+          <div class="row">
+            <label>Clavier</label>
+            <div class="seg" id="layoutSeg"><button data-v="qwerty">QWERTY</button><button data-v="azerty">AZERTY</button></div>
+          </div>
+          <div class="row">
+            <label>Effets</label>
+            <div class="seg" id="goreSeg"><button data-v="blood">Sang cartoon</button><button data-v="confetti">Confettis</button></div>
+          </div>
+          <div class="row"><label>Sensibilité</label><input type="range" id="sensRange" min="0.2" max="3" step="0.05" /><output id="sensOut"></output></div>
+          <div class="row"><label>Champ de vision</label><input type="range" id="fovRange" min="65" max="100" step="1" /><output id="fovOut"></output></div>
+          <div class="row"><label>Volume</label><input type="range" id="volRange" min="0" max="1" step="0.01" /><output id="volOut"></output></div>
+          <div class="row"><label>Musique</label><div class="seg" id="musicSeg"><button data-v="on">Oui</button><button data-v="off">Non</button></div></div>
+        </div>
+        <div class="controls-card">
+          <div><kbd>ZQSD</kbd>/<kbd>WASD</kbd> bouger · <kbd>MAJ</kbd> sprint · <kbd>ESPACE</kbd> sauter</div>
+          <div><kbd>CLIC G</kbd> poing gauche · <kbd>CLIC D</kbd> poing droit · <b>maintenir</b> = coup chargé</div>
+          <div><kbd>F</kbd> coup de pied (maintenir = spartiate) · <kbd>A</kbd>/<kbd>Q</kbd> garde · <kbd>C</kbd> esquive</div>
+          <div><kbd>E</kbd> ramasser / saisir un adversaire sonné · <kbd>E</kbd> encore = le soulever · <kbd>CLIC</kbd> = le jeter&nbsp;!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- pause -->
+    <div id="pause" class="screen hidden">
+      <div class="menu-inner narrow">
+        <div class="title">PAUSE</div>
+        <button class="btn primary" id="resumeBtn">REPRENDRE</button>
+        <button class="btn" id="restartBtn">RECOMMENCER</button>
+        <button class="btn" id="menuBtn">MENU</button>
+      </div>
+    </div>
+
+    <!-- results -->
+    <div id="results" class="screen hidden">
+      <div class="menu-inner narrow">
+        <div class="result-title" id="resTitle">VICTOIRE !</div>
+        <div class="result-method" id="resMethod">Lancé dans le vide</div>
+        <div class="result-score" id="resScore">1 — 0</div>
+        <div class="stats" id="resStats"></div>
+        <button class="btn primary" id="againBtn">REJOUER <kbd>R</kbd></button>
+        <button class="btn" id="resMenuBtn">MENU</button>
+      </div>
+    </div>
+
+    <div id="flash"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
