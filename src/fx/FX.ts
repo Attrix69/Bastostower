@@ -169,7 +169,7 @@ export class FX {
         pos,
         vel: _v,
         color: conf ? pick(CONFETTI) : chance(0.7) ? BLOOD : BLOOD_DARK,
-        size: conf ? rand(0.03, 0.05) : rand(0.025, 0.06) * (0.8 + power * 0.4),
+        size: conf ? rand(0.03, 0.05) : rand(0.018, 0.042) * (0.8 + power * 0.35),
         life: rand(0.8, 1.6),
         gravity: conf ? 4 : 14,
         drag: conf ? 3 : 0.5,

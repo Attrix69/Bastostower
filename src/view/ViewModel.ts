@@ -168,7 +168,8 @@ export class ViewModel {
         if (hold.mode === 'carry') des.set(left ? -0.3 : 0.3, 0.1 + Math.sin(this.time * 3) * 0.015, -0.38);
         else if (!left) des.set(0.14, -0.3, -0.62);
       }
-      if (a && (a.def.limb === (left ? 'handL' : 'handR') || (a.def.limb === 'weapon' && !left))) {
+      const twoHandedThrow = hold?.kind === 'prop' && hold.twoHanded;
+      if (a && !twoHandedThrow && (a.def.limb === (left ? 'handL' : 'handR') || (a.def.limb === 'weapon' && !left))) {
         const t = a.phase === 'hold' ? 0 : a.t + alpha * (1 / 60);
         samplePath(a.def.path, Math.min(t, a.def.duration), des);
         if (a.phase === 'hold' && a.holdTime > HEAVY_THRESHOLD) {
