@@ -341,9 +341,15 @@ export class Animator {
     const h = f.hold;
     if (h?.kind === 'prop') {
       if (h.twoHanded) {
-        const pull = a && a.button === 'throw' ? (a.phase === 'hold' ? 0.25 : -0.2) : 0;
-        desL.set(-0.2, -0.3 + pull * 0.6, -0.55 + pull);
-        desR.set(0.2, -0.3 + pull * 0.6, -0.55 + pull);
+        if (a && a.button === 'throw') {
+          const y = a.phase === 'hold' ? 0.15 : -0.05;
+          const z = a.phase === 'hold' ? -0.42 : -0.8;
+          desL.set(-0.2, y, z);
+          desR.set(0.2, y, z);
+        } else {
+          desL.set(-0.2, -0.3, -0.55);
+          desR.set(0.2, -0.3, -0.55);
+        }
       } else {
         desR.set(0.24, -0.27, -0.42);
       }

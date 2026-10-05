@@ -67,6 +67,9 @@ export class Input {
   invertY = false;
   /** 'qwerty' uses WASD+Q, 'azerty' uses ZQSD + A for block */
   layout: 'qwerty' | 'azerty' = 'qwerty';
+  /** layout guessed from the system (used when the setting is 'auto') */
+  detectedLayout: 'qwerty' | 'azerty' = 'qwerty';
+  onLayoutDetected: ((l: 'qwerty' | 'azerty') => void) | null = null;
   /** Count of key presses since last consume, used for "mash" escapes. */
   mashCount = 0;
   onPointerLockChange: ((locked: boolean) => void) | null = null;
@@ -95,6 +98,11 @@ export class Input {
       this.mouseDX += e.movementX;
       this.mouseDY += e.movementY;
     });
+    // some embeddings (sandboxed iframes...) refuse pointer lock: fall back to plain mouse input
+    document.addEventListener('pointerlockerror', () => {
+      this.allowUnlocked = true;
+      this.onPointerLockChange?.(true);
+    });
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.element;
       if (!this.locked && !this.allowUnlocked) this.releaseAll();
@@ -108,12 +116,14 @@ export class Input {
     if (kb?.getLayoutMap) {
       try {
         const map = await kb.getLayoutMap();
-        if (map.get('KeyQ') === 'a') this.layout = 'azerty';
+        if (map.get('KeyQ') === 'a') this.detectedLayout = 'azerty';
+        this.onLayoutDetected?.(this.detectedLayout);
       } catch {
         /* ignore */
       }
     } else if (/^fr\b/i.test(navigator.language)) {
-      this.layout = 'azerty';
+      this.detectedLayout = 'azerty';
+      this.onLayoutDetected?.(this.detectedLayout);
     }
   }
 

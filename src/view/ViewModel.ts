@@ -161,8 +161,8 @@ export class ViewModel {
       if (f.blocking) des.set(left ? -0.1 : 0.11, -0.05, -0.27);
       if (hold?.kind === 'prop') {
         if (hold.twoHanded) {
-          const pull = a && a.button === 'throw' ? (a.phase === 'hold' ? 0.22 : -0.25) : 0;
-          des.set(left ? -0.22 : 0.22, -0.28 + pull * 0.4, -0.55 + pull);
+          if (a && a.button === 'throw') des.set(left ? -0.2 : 0.2, a.phase === 'hold' ? 0.12 : -0.08, a.phase === 'hold' ? -0.42 : -0.78);
+          else des.set(left ? -0.22 : 0.22, -0.28, -0.55);
         } else if (!left) des.set(0.24, -0.27, -0.42);
       } else if (hold?.kind === 'fighter') {
         if (hold.mode === 'carry') des.set(left ? -0.3 : 0.3, 0.1 + Math.sin(this.time * 3) * 0.015, -0.38);

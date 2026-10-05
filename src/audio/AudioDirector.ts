@@ -14,6 +14,7 @@ export class AudioDirector {
   private screams = new Map<Fighter, Tracked>();
   private lastVoice = new Map<Fighter, number>();
   private now = () => performance.now() / 1000;
+  private alarmed = false;
 
   constructor(
     readonly audio: AudioEngine,
@@ -57,7 +58,15 @@ export class AudioDirector {
       if (chance(0.4)) a.voice(pos(e.fighter), e.fighter.def.voice * 1.2, 'u', 0.08, 0.2, 1.1);
     });
     events.on('dodge', (e) => a.whoosh(pos(e.fighter), false));
-    events.on('bodyImpact', (e) => a.bodySlam(e.pos, e.speed));
+    events.on('bodyImpact', (e) => {
+      a.bodySlam(e.pos, e.speed);
+      // a body landing in the street, 120 m below: somebody's car takes it
+      if (e.pos.y < -100 && !this.alarmed) {
+        this.alarmed = true;
+        a.carAlarm(e.pos);
+        window.setTimeout(() => (this.alarmed = false), 4000);
+      }
+    });
     events.on('propImpact', (e) => {
       if (e.prop.def.special === 'squeak') a.squeak(e.pos);
       else a.material(e.prop.def.sound, e.pos, e.speed);

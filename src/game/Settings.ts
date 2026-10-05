@@ -5,7 +5,7 @@ export interface Settings {
   difficulty: Difficulty;
   opponent: string;
   quality: QualityLevel;
-  layout: 'qwerty' | 'azerty';
+  layout: 'auto' | 'qwerty' | 'azerty';
   gore: 'blood' | 'confetti';
   sensitivity: number;
   fov: number;
@@ -20,7 +20,7 @@ export function loadSettings(defaults: Partial<Settings>): Settings {
     difficulty: 'normal',
     opponent: 'random',
     quality: 'high',
-    layout: 'qwerty',
+    layout: 'auto',
     gore: 'blood',
     sensitivity: 1,
     fov: 80,

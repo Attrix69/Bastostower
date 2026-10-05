@@ -79,6 +79,8 @@ const THROW_DEF: AttackDef = {
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _rv = new THREE.Vector3();
+const _tv = new THREE.Vector3();
+const _tq = new THREE.Quaternion();
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _e = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -409,10 +411,20 @@ export class Fighter {
         break;
       case FState.KO:
         this.koTimer -= dt;
-        if (this.koTimer <= 0 && this.settle > 0.25 && !this.heldBy) this.beginGetUp();
+        // normally wait for the body to settle; never stay down forever if it keeps jittering
+        if (!this.heldBy && ((this.koTimer <= 0 && this.settle > 0.25) || this.koTimer < -2.5)) this.beginGetUp();
         break;
       case FState.Grabbed:
-      case FState.Carried:
+      case FState.Carried: {
+        // safety: the holder must still be holding us
+        const h = this.heldBy?.hold;
+        if (!this.heldBy || !h || h.kind !== 'fighter' || h.target !== this) {
+          this.heldBy = null;
+          this.ragdoll.releaseKinematic();
+          this.ragdoll.setIgnoreFighter(null);
+          this.setState(this.koTimer > 0 ? FState.KO : FState.Thrown);
+          break;
+        }
         this.koTimer -= dt;
         if (this.koTimer <= 0) {
           // awake: struggle to escape
@@ -420,6 +432,7 @@ export class Fighter {
           if (this.escape >= 1 && this.heldBy) this.heldBy.releaseHold('escape');
         }
         break;
+      }
       case FState.Thrown:
         if (this.koTimer > 0) this.koTimer -= dt;
         if (this.stateTime > 0.45 && this.settle > 0.3) {
@@ -586,17 +599,9 @@ export class Fighter {
       return;
     }
     if (a.button !== 'throw') return;
-    const power = (0.4 + 0.6 * a.charge) * (this.exhausted ? 0.6 : 1);
-    this.aimQuat(_q);
-    const dir = _v2.set(0, 0, -1).applyQuaternion(_q);
+    const v = this.throwVelocity(a.charge, _v);
+    const speed = v.length();
     if (h.kind === 'fighter') {
-      // throw a body: mostly forward with a lob
-      dir.y = clamp(dir.y + 0.28, 0.08, 0.75);
-      dir.normalize();
-      const speed = (7.5 + 10.5 * power) / Math.sqrt(h.target.massMul) * (h.mode === 'drag' ? 0.8 : 1);
-      const v = _v.copy(dir).multiplyScalar(speed);
-      v.x += this.vel.x * 0.9;
-      v.z += this.vel.z * 0.9;
       const victim = h.target;
       this.stats.throws++;
       this.releaseHold('throw', v);
@@ -604,11 +609,7 @@ export class Fighter {
       this.ctx.events.emit('throwBody', { attacker: this, victim, speed });
     } else {
       const prop = h.prop;
-      dir.y += 0.07;
-      dir.normalize();
-      const massF = clamp(1.7 / Math.sqrt(Math.max(prop.def.mass, 0.3)), 0.32, 1.3);
-      const speed = (9 + 15 * power) * massF;
-      const v = _v.copy(dir).multiplyScalar(speed).add(this.vel);
+      const power = (0.4 + 0.6 * a.charge) * (this.exhausted ? 0.6 : 1);
       this.hold = null;
       rightFromYaw(this.yaw, _right);
       const spin = _v2.copy(_right).multiplyScalar(-(prop.def.spin ?? 7) * (0.5 + power));
@@ -616,6 +617,34 @@ export class Fighter {
       this.stats.propsThrown++;
       this.ctx.events.emit('throwProp', { fighter: this, prop, speed });
     }
+  }
+
+  /**
+   * Release velocity of whatever we hold for a given charge (0..1). Shared by
+   * the actual throw and the aiming arc preview, so the preview never lies.
+   */
+  throwVelocity(charge: number, out: THREE.Vector3) {
+    const h = this.hold;
+    out.set(0, 0, 0);
+    if (!h) return out;
+    const power = (0.4 + 0.6 * charge) * (this.exhausted ? 0.6 : 1);
+    this.aimQuat(_tq);
+    const dir = _tv.set(0, 0, -1).applyQuaternion(_tq);
+    if (h.kind === 'fighter') {
+      // throw a body: mostly forward with a lob
+      dir.y = clamp(dir.y + 0.28, 0.08, 0.75);
+      dir.normalize();
+      const speed = ((7.5 + 10.5 * power) / Math.sqrt(h.target.massMul)) * (h.mode === 'drag' ? 0.8 : 1);
+      out.copy(dir).multiplyScalar(speed);
+      out.x += this.vel.x * 0.9;
+      out.z += this.vel.z * 0.9;
+    } else {
+      dir.y += 0.07;
+      dir.normalize();
+      const massF = clamp(1.7 / Math.sqrt(Math.max(h.prop.def.mass, 0.3)), 0.32, 1.3);
+      out.copy(dir).multiplyScalar((9 + 15 * power) * massF).add(this.vel);
+    }
+    return out;
   }
 
   // ------------------------------------------------------------------ movement
@@ -1294,8 +1323,9 @@ export class Fighter {
       // held in front with both hands, pulled back while charging a throw
       const p = _v2.set(0, -0.32, -0.62);
       if (a && a.button === 'throw') {
-        if (a.phase === 'hold') p.set(0, -0.12, -0.35 + Math.min(a.holdTime, 0.6) * 0.15);
-        else p.set(0, -0.1, -0.85);
+        // wind up over the head (keeps the view clear), then heave forward
+        if (a.phase === 'hold') p.set(0, 0.2 + Math.min(a.holdTime, 0.6) * 0.08, -0.45);
+        else p.set(0, -0.02, -0.85);
       }
       this.framePoint('aim', p, outPos);
       outQuat.setFromAxisAngle(UP, this.yaw);

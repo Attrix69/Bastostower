@@ -290,7 +290,7 @@ export class AIController {
     if ((f.stamina < 22 || f.exhausted) && this.goal !== 'retreat') return this.setGoal('retreat');
     if (this.goal === 'retreat' && f.stamina < 60) return;
     if (this.goal === 'getProp' && this.targetProp && !this.targetProp.heldBy && !this.targetProp.broken && this.goalTime < 4.5) return;
-    if (d > 3.2 && Math.random() < p.propChance * 0.25) {
+    if (d > 3.2 && Math.random() < p.propChance * 0.08) {
       const prop = this.pickProp();
       if (prop) {
         this.targetProp = prop;

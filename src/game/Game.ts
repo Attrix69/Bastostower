@@ -17,6 +17,7 @@ import { AIController, Difficulty } from '../control/AIController';
 import { CombatSystem } from '../combat/CombatSystem';
 import { InteractionSystem } from '../interaction/InteractionSystem';
 import { FX } from '../fx/FX';
+import { AimArc } from '../fx/AimArc';
 import { AudioEngine } from '../audio/Audio';
 import { AudioDirector } from '../audio/AudioDirector';
 import { CameraRig } from '../camera/CameraRig';
@@ -65,6 +66,7 @@ export class Game {
   readonly combat: CombatSystem;
   readonly interaction: InteractionSystem;
   readonly fx: FX;
+  readonly aimArc = new AimArc();
   readonly audio = new AudioEngine();
   readonly audioDir: AudioDirector;
   readonly cam: CameraRig;
@@ -103,7 +105,7 @@ export class Game {
     if (qParam === 'low' || qParam === 'medium' || qParam === 'high') this.settings.quality = qParam;
     this.input = new Input(canvas);
     this.input.allowUnlocked = this.debug;
-    if (this.settings.layout) this.input.layout = this.settings.layout;
+    this.input.onLayoutDetected = () => this.applySettings();
     this.loop = new Loop(
       (dt, real) => this.fixedUpdate(dt, real),
       (alpha, real) => this.render(alpha, real),
@@ -162,7 +164,7 @@ export class Game {
     for (const e of this.enemies) this.ais.set(e, new AIController(ctx, e, this.interaction, this.settings.difficulty));
     this.playerCtrl = new PlayerController(this.input, this.player);
     this.fx = new FX(this.events, () => ctx.fighters);
-    scene.add(this.fx.group);
+    scene.add(this.fx.group, this.aimArc.mesh);
     this.audioDir = new AudioDirector(this.audio, this.events);
     this.cam = new CameraRig(this.engine.camera, physics);
     this.vm = new ViewModel(this.engine.vmScene, PLAYER_CHARACTER.look, this.envMap);
@@ -216,8 +218,8 @@ export class Game {
     this.audio.setVolume(s.volume);
     this.audio.setMusic(s.music);
     this.fx.gore = s.gore;
-    this.input.layout = s.layout;
-    this.hud.setBlockKey(s.layout === 'azerty' ? 'A' : 'Q');
+    this.input.layout = s.layout === 'auto' ? this.input.detectedLayout : s.layout;
+    this.hud.setBlockKey(this.input.layout === 'azerty' ? 'A' : 'Q');
     for (const ai of this.ais.values()) ai.setDifficulty(s.difficulty as Difficulty);
     if (this.engine.quality !== s.quality) this.engine.setQuality(s.quality);
     saveSettings(s);
@@ -272,7 +274,7 @@ export class Game {
       else if ((this.flow === 'fight' || this.flow === 'intro') && !this.input.locked && !this.debug) this.input.requestLock();
     });
     this.input.onPointerLockChange = (locked) => {
-      if (!locked && (this.flow === 'fight' || this.flow === 'intro') && !this.debug) this.pause();
+      if (!locked && (this.flow === 'fight' || this.flow === 'intro') && !this.debug && !this.input.allowUnlocked) this.pause();
       if (locked && this.flow === 'paused') this.unpause();
     };
     window.addEventListener('keydown', (e) => {
@@ -502,7 +504,7 @@ export class Game {
       return;
     }
     const live = this.flow === 'fight';
-    this.playerCtrl.update(live && (this.input.locked || this.debug));
+    this.playerCtrl.update(live && (this.input.locked || this.input.allowUnlocked));
     const ai = this.ais.get(this.enemy)!;
     ai.update(dt);
     this.interaction.update();
@@ -545,6 +547,12 @@ export class Game {
     const gameDt = realDt * this.loop.timeScale;
     this.cam.update(realDt, gameDt, alpha, p, this.playerCtrl.yaw, this.playerCtrl.pitch);
     const cam = this.engine.camera;
+    // view model shares the world FOV so held props, fists and hitboxes line up on screen
+    const vmCam = this.engine.vmCamera;
+    if (Math.abs(vmCam.fov - cam.fov) > 0.01) {
+      vmCam.fov = cam.fov;
+      vmCam.updateProjectionMatrix();
+    }
     // the player's own body: invisible in first person but still casts its shadow
     const fp = this.cam.mode === 'fps' && this.flow !== 'menu';
     if (p.rig.material.colorWrite === fp) {
@@ -557,6 +565,7 @@ export class Game {
 
     // ---- fx, world anims
     this.fx.update(gameDt, cam);
+    this.aimArc.update(realDt, p);
     this.city.update(this.loop.realTime);
     this.sky.update(this.loop.realTime);
     this.hud.update(realDt, p, this.enemy, this.interaction.options[0], this.flow === 'fight');

@@ -50,6 +50,8 @@ export class FX {
   budget = 1;
   /** 'blood' or 'confetti' (family friendly) */
   gore: 'blood' | 'confetti' = 'blood';
+  /** camera position (for screen-size aware effects) */
+  private camPos = new THREE.Vector3(0, 100, 0);
   /** screen feedback hooks (camera & post FX) */
   onScreenFlash: ((color: THREE.ColorRepresentation, strength: number) => void) | null = null;
 
@@ -126,11 +128,14 @@ export class FX {
 
   // ------------------------------------------------------------------ primitives
   flash(pos: THREE.Vector3, color: THREE.ColorRepresentation, size: number, life = 0.12) {
+    // never let an impact flash swallow the screen when it happens right in your face
+    size = Math.min(size, pos.distanceTo(this.camPos) * 0.32);
     this.additive.emit({ pos, cell: Sprite.Burst, color, size: size * 0.6, endSize: size, life, intensity: 2.2, rotSpeed: 4 });
     this.additive.emit({ pos, cell: Sprite.Dot, color, size: size * 1.4, endSize: size * 0.4, life: life * 0.8, intensity: 1.5 });
   }
 
   ring(pos: THREE.Vector3, color: THREE.ColorRepresentation, size: number, life = 0.22) {
+    size = Math.min(size, pos.distanceTo(this.camPos) * 0.45);
     this.additive.emit({ pos, cell: Sprite.Ring, color, size: size * 0.2, endSize: size, life, intensity: 1.8 });
   }
 
@@ -207,6 +212,14 @@ export class FX {
     c.sprite.visible = true;
     c.sprite.position.copy(pos);
     c.sprite.position.y += 0.35;
+    // keep words readable but never screen-filling: push them away from the camera if needed
+    const d = c.sprite.position.distanceTo(this.camPos);
+    if (d < 2.2) {
+      _v.subVectors(c.sprite.position, this.camPos).normalize();
+      c.sprite.position.copy(this.camPos).addScaledVector(_v, 2.2);
+      c.sprite.position.y += 0.25;
+    }
+    scale = Math.min(scale, 0.18 * Math.max(d, 2.2));
     c.life = 0.7;
     c.max = 0.7;
     c.base = scale;
@@ -338,6 +351,7 @@ export class FX {
 
   // ------------------------------------------------------------------ update
   update(dt: number, camera: THREE.Camera) {
+    camera.getWorldPosition(this.camPos);
     this.chunks.update(dt);
     this.drops.update(dt);
     this.additive.update(dt);
